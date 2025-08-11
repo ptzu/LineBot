@@ -101,7 +101,10 @@ def colorize_image(image_bytes):
         # 使用 Replicate Python SDK
         output = replicate.run(
             REPLICATE_MODEL,
-            input={"image": image_data_url}
+            input={
+                "input_image": image_data_url,
+                "model_name": "Stable"
+            }
         )
         
         if output and len(output) > 0:
@@ -111,7 +114,10 @@ def colorize_image(image_bytes):
             
     except Exception as e:
         print(f"Replicate API 錯誤: {str(e)}")
-        raise Exception(f"彩色化處理失敗: {str(e)}")
+        if "Insufficient credit" in str(e):
+            raise Exception("Replicate 點數不足，請前往 https://replicate.com/account/billing#billing 購買點數")
+        else:
+            raise Exception(f"彩色化處理失敗: {str(e)}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
