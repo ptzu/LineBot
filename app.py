@@ -29,7 +29,7 @@ handler = WebhookHandler(os.getenv("CHANNEL_SECRET"))
 # 設定 Replicate API token
 os.environ["REPLICATE_API_TOKEN"] = os.getenv("REPLICATE_API_TOKEN")
 
-REPLICATE_MODEL = "arielreplicate/deoldify_image"  # DeOldify 彩色化模型
+REPLICATE_MODEL = "arielreplicate/deoldify_image:0da600fab0c45a66211339f1c16b71345d22f26ef5fea3dca1bb90bb5711e950"  # DeOldify 彩色化模型
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
