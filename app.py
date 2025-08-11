@@ -1,89 +1,87 @@
-from flask import Flask, request, abort
-import json
-import requests
 import os
-import hashlib
-import hmac
 import base64
+import tempfile
+import requests
+from flask import Flask, request, abort
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import (
+    MessageEvent, TextMessage, ImageMessage,
+    TextSendMessage, ImageSendMessage
+)
 
 app = Flask(__name__)
 
-# LINE Bot 設定
-CHANNEL_ACCESS_TOKEN = os.environ.get('CHANNEL_ACCESS_TOKEN')
-CHANNEL_SECRET = os.environ.get('CHANNEL_SECRET')
+line_bot_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
+handler = WebhookHandler(os.getenv("LINE_CHANNEL_SECRET"))
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
-# LINE API 端點
-LINE_API_REPLY = 'https://api.line.me/v2/bot/message/reply'
+REPLICATE_MODEL_VERSION = "fb15d64e807e38c0603d9bb95d65a48d33cb8393cd5e356045b63c6f23649e0c"  # DeOldify v2
 
-def verify_signature(body, signature):
-    """驗證 LINE webhook 簽名"""
-    if not CHANNEL_SECRET:
-        return False
-    
-    hash_value = hmac.new(
-        CHANNEL_SECRET.encode('utf-8'),
-        body.encode('utf-8'),
-        hashlib.sha256
-    ).digest()
-    
-    expected_signature = base64.b64encode(hash_value).decode('utf-8')
-    return hmac.compare_digest(signature, expected_signature)
-
-def send_reply_message(reply_token, message_text):
-    """發送回覆訊息到 LINE"""
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {CHANNEL_ACCESS_TOKEN}'
-    }
-    
-    data = {
-        'replyToken': reply_token,
-        'messages': [
-            {
-                'type': 'text',
-                'text': message_text
-            }
-        ]
-    }
-    
-    response = requests.post(LINE_API_REPLY, headers=headers, json=data)
-    return response.status_code == 200
-
-@app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    """處理 LINE webhook 事件"""
-    # 取得請求標頭和內容
-    signature = request.headers.get('X-Line-Signature')
+    signature = request.headers.get("X-Line-Signature")
     body = request.get_data(as_text=True)
-    
-    # 驗證簽名
-    if not verify_signature(body, signature):
-        abort(400)
-    
     try:
-        # 解析 JSON 資料
-        events = json.loads(body)['events']
-        
-        for event in events:
-            # 只處理文字訊息事件
-            if event['type'] == 'message' and event['message']['type'] == 'text':
-                reply_token = event['replyToken']
-                message_text = event['message']['text']
-                
-                # 回傳相同的訊息
-                send_reply_message(reply_token, message_text)
-        
-        return 'OK', 200
-        
-    except Exception as e:
-        print(f'Error processing webhook: {e}')
-        abort(500)
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+    return "OK"
 
-@app.route('/')
-def health_check():
-    """健康檢查端點"""
-    return 'LineBot Flask Server is running!'
+@handler.add(MessageEvent, message=TextMessage)
+def handle_text(event):
+    # 簡單 Echo
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=event.message.text)
+    )
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+@handler.add(MessageEvent, message=ImageMessage)
+def handle_image(event):
+    # 1. 從 LINE 下載圖片
+    message_content = line_bot_api.get_message_content(event.message.id)
+    image_bytes = b''.join(chunk for chunk in message_content.iter_content())
+
+    # 2. 轉成 Base64（Replicate 可直接吃）
+    image_b64 = "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode()
+
+    # 3. 呼叫 Replicate API
+    output_url = colorize_image(image_b64)
+
+    # 4. 回傳彩色圖片
+    line_bot_api.reply_message(
+        event.reply_token,
+        ImageSendMessage(
+            original_content_url=output_url,
+            preview_image_url=output_url
+        )
+    )
+
+def colorize_image(image_b64):
+    """呼叫 Replicate 彩色化 API"""
+    url = "https://api.replicate.com/v1/predictions"
+    headers = {
+        "Authorization": f"Token {REPLICATE_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "version": REPLICATE_MODEL_VERSION,
+        "input": {"image": image_b64}
+    }
+    res = requests.post(url, json=payload, headers=headers).json()
+    prediction_id = res["id"]
+
+    # 等待結果
+    while True:
+        res = requests.get(f"{url}/{prediction_id}", headers=headers).json()
+        if res["status"] in ["succeeded", "failed"]:
+            break
+
+    if res["status"] == "succeeded":
+        # DeOldify 回傳的是單一 URL
+        return res["output"]
+    else:
+        raise Exception("彩色化失敗")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
