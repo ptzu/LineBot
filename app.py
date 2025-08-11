@@ -107,8 +107,16 @@ def colorize_image(image_bytes):
             }
         )
         
-        if output and len(output) > 0:
-            return output[0]  # 回傳第一個結果
+        if output:
+            # 如果 output 是字串（URL），直接回傳
+            if isinstance(output, str):
+                return output
+            # 如果 output 是列表，回傳第一個元素
+            elif isinstance(output, list) and len(output) > 0:
+                return output[0]
+            # 如果 output 是 FileOutput 物件，轉換為字串
+            else:
+                return str(output)
         else:
             raise Exception("API 沒有回傳結果")
             
