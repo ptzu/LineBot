@@ -103,7 +103,7 @@ def colorize_image(image_bytes):
             REPLICATE_MODEL,
             input={
                 "input_image": image_data_url,
-                "model_name": "Stable"
+                "model_name": "Artistic"
             }
         )
         
