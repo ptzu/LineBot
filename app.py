@@ -94,10 +94,14 @@ def handle_image(event):
 def colorize_image(image_bytes):
     """呼叫 Replicate 彩色化 API"""
     try:
+        # 將 bytes 轉換為 base64 格式
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        image_data_url = f"data:image/jpeg;base64,{image_b64}"
+        
         # 使用 Replicate Python SDK
         output = replicate.run(
             REPLICATE_MODEL,
-            input={"image": image_bytes}
+            input={"image": image_data_url}
         )
         
         if output and len(output) > 0:
