@@ -10,7 +10,7 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
     MessageEvent, TextMessage, ImageMessage,
-    TextSendMessage, ImageSendMessage
+    TextSendMessage, ImageSendMessage, QuickReply, QuickReplyButton
 )
 
 app = Flask(__name__)
@@ -43,11 +43,26 @@ def webhook():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_text(event):
-    # 簡單 Echo
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=event.message.text)
-    )
+    user_message = event.message.text
+    
+    # 處理功能選單命令
+    if user_message == "!功能":
+        quick_reply_buttons = [
+            QuickReplyButton(action=TextSendMessage(text="📸 圖片彩色化")),
+            QuickReplyButton(action=TextSendMessage(text="💬 文字回覆")),
+            QuickReplyButton(action=TextSendMessage(text="❓ 使用說明")),
+            QuickReplyButton(action=TextSendMessage(text="🔧 其他功能"))
+        ]
+        
+        quick_reply = QuickReply(items=quick_reply_buttons)
+        
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text="🤖 請選擇您想要的功能：",
+                quick_reply=quick_reply
+            )
+        )
 
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
