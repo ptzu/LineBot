@@ -56,6 +56,33 @@ class MessagePublisher:
     def __init__(self, line_bot_api):
         self.line_bot_api = line_bot_api
     
+    def _get_source_type(self, event):
+        """
+        檢測訊息來源類型
+        
+        Args:
+            event: LINE webhook event
+            
+        Returns:
+            str: 'user', 'group', 'room' 或 'unknown'
+        """
+        source = event.get('source', {})
+        source_type = source.get('type', 'unknown')
+        return source_type
+    
+    def _is_group_chat(self, event):
+        """
+        判斷是否為群組聊天
+        
+        Args:
+            event: LINE webhook event
+            
+        Returns:
+            bool: True 如果是群組聊天，False 如果是個人聊天
+        """
+        source_type = self._get_source_type(event)
+        return source_type in ['group', 'room']
+    
     def _is_valid_user(self, user_id):
         """
         驗證 LINE userId 是否有效
@@ -242,7 +269,7 @@ class MessagePublisher:
     #     # valid user：直接使用 LINE Bot API
     #     return self.line_bot_api.push_message(user_id, messages)
     
-    def process_reply_message(self, reply_token, messages, user_id):
+    def process_reply_message(self, reply_token, messages, user_id, event=None):
         """
         處理回覆訊息，包含用戶驗證和 Flask 回應
         
@@ -250,10 +277,18 @@ class MessagePublisher:
             reply_token: LINE 回覆 token
             messages: 要發送的訊息
             user_id: 用戶 ID
+            event: LINE webhook event（用於判斷是否為群組聊天）
         
         Returns:
             Flask Response: 包含純訊息的 JSON 回應或 None（表示正常處理）
         """
+        # 如果是群組聊天，跳過用戶驗證
+        if event and self._is_group_chat(event):
+            print(f"群組聊天，跳過用戶驗證，直接回應")
+            self.line_bot_api.reply_message(reply_token, messages)
+            return None
+        
+        # 個人聊天才進行用戶驗證
         validation_result = self._is_valid_user(user_id)
         print(f"驗證結果: {validation_result}")
         if not validation_result['is_valid']:
@@ -266,17 +301,25 @@ class MessagePublisher:
         self.line_bot_api.reply_message(reply_token, messages)
         return None  # 表示正常處理，不需要特殊回應
     
-    def process_push_message(self, user_id, messages):
+    def process_push_message(self, user_id, messages, event=None):
         """
         處理推送訊息，包含用戶驗證和 Flask 回應
         
         Args:
             user_id: 用戶 ID
             messages: 要發送的訊息
+            event: LINE webhook event（用於判斷是否為群組聊天）
         
         Returns:
             Flask Response: 包含純訊息的 JSON 回應或 None（表示正常處理）
         """
+        # 如果是群組聊天，跳過用戶驗證
+        if event and self._is_group_chat(event):
+            print(f"群組聊天，跳過用戶驗證，直接推送訊息")
+            self.line_bot_api.push_message(user_id, messages)
+            return None
+        
+        # 個人聊天才進行用戶驗證
         validation_result = self._is_valid_user(user_id)
         if not validation_result['is_valid']:
             # invalid user (unit test)：回傳純訊息 JSON
@@ -378,7 +421,8 @@ def handle_text_message(event):
                     text=f"{user_name} 你好\n🤖 請選擇您想要的功能：",
                     quick_reply=quick_reply
                 ),
-                user_id
+                user_id,
+                event
             )
             if result:  # 如果回傳 JSON
                 return result
@@ -401,7 +445,8 @@ def handle_text_message(event):
                     text=f"{user_name} 你好\n📸 圖片彩色化功能\n\n請確認是否要進行彩色化處理？\n\n⚠️ 注意：彩色化處理需要消耗 1 點數，請確認後再上傳圖片。",
                     quick_reply=quick_reply
                 ),
-                user_id
+                user_id,
+                event
             )
             if result:  # 如果回傳 JSON
                 return result
@@ -412,7 +457,8 @@ def handle_text_message(event):
                 result = publisher.process_reply_message(
                     reply_token,
                     TextSendMessage(text=f"{user_name} 你好\n✅ 已確認彩色化功能\n\n請上傳一張黑白照片，我將為您進行彩色化處理。"),
-                    user_id
+                    user_id,
+                    event
                 )
                 if result:  # 如果回傳 JSON
                     return result
@@ -420,7 +466,8 @@ def handle_text_message(event):
                 result = publisher.process_reply_message(
                     reply_token,
                     TextSendMessage(text=f"{user_name} 你好\n❌ 您目前沒有等待確認的彩色化請求\n\n請先輸入「圖片彩色化」來啟動功能。"),
-                    user_id
+                    user_id,
+                    event
                 )
                 if result:  # 如果回傳 JSON
                     return result
@@ -432,7 +479,8 @@ def handle_text_message(event):
             result = publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"{user_name} 你好\n❌ 已取消彩色化功能\n\n如需使用其他功能，請輸入「!功能」查看選單。"),
-                user_id
+                user_id,
+                event
             )
             if result:  # 如果回傳 JSON
                 return result
@@ -455,7 +503,8 @@ def handle_text_message(event):
             result = publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=help_message),
-                user_id
+                user_id,
+                event
             )
             if result:  # 如果回傳 JSON
                 return result
@@ -464,7 +513,8 @@ def handle_text_message(event):
             result = publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"{user_name} 你好\n🔧 其他功能\n\n更多功能正在開發中，敬請期待！\n\n目前可用的功能：\n• 圖片彩色化\n• 文字對話\n• 使用說明"),
-                user_id
+                user_id,
+                event
             )
             if result:  # 如果回傳 JSON
                 return result
@@ -513,40 +563,77 @@ def handle_image_message(event):
         message_content = line_bot_api.get_message_content(message_id)
         image_bytes = b''.join(chunk for chunk in message_content.iter_content())
 
-        # 2. 先回覆用戶正在處理（包含用戶驗證）
-        result = publisher.process_reply_message(
-            reply_token,
-            TextSendMessage(text=f"{user_name} 你好\n正在處理您的圖片，請稍候..."),
-            user_id
-        )
-        if result:  # 如果回傳錯誤 JSON
-            return result
+        # 2. 判斷是否為群組聊天
+        is_group = event and publisher._is_group_chat(event)
+        
+        if is_group:
+            # 群組聊天：先回覆「正在處理...」到群組
+            result = publisher.process_reply_message(
+                reply_token,
+                TextSendMessage(text=f"{user_name} 你好\n正在處理您的圖片，請稍候..."),
+                user_id,
+                event
+            )
+            if result:  # 如果回傳錯誤 JSON
+                return result
+        else:
+            # 個人聊天：先回覆「正在處理...」到個人
+            result = publisher.process_reply_message(
+                reply_token,
+                TextSendMessage(text=f"{user_name} 你好\n正在處理您的圖片，請稍候..."),
+                user_id,
+                event
+            )
+            if result:  # 如果回傳錯誤 JSON
+                return result
 
         # 3. 在背景執行彩色化處理
         def process_image_async():
             try:
                 output_url = colorize_image(image_bytes)
-                # 回傳彩色圖片（包含用戶驗證）
-                error_result = publisher.process_push_message(
-                    user_id,
-                    ImageSendMessage(
-                        original_content_url=output_url,
-                        preview_image_url=output_url
+                
+                if is_group:
+                    # 群組聊天：使用 reply_message 回覆到群組
+                    # 注意：reply_token 有時效性，但通常足夠處理圖片
+                    publisher.line_bot_api.reply_message(
+                        reply_token,
+                        ImageSendMessage(
+                            original_content_url=output_url,
+                            preview_image_url=output_url
+                        )
                     )
-                )
-                # 注意：背景處理中如果用戶無效，只能記錄 JSON 結果
-                if error_result:
-                    print(f"背景處理時用戶無效，JSON 回應: {error_result}")
+                    print(f"群組聊天：圖片處理完成，已回覆到群組")
+                else:
+                    # 個人聊天：使用 push_message 發送到個人
+                    error_result = publisher.process_push_message(
+                        user_id,
+                        ImageSendMessage(
+                            original_content_url=output_url,
+                            preview_image_url=output_url
+                        ),
+                        event
+                    )
+                    if error_result:
+                        print(f"個人聊天：背景處理時用戶無效，JSON 回應: {error_result}")
                     
             except Exception as e:
-                # 回傳錯誤訊息（包含用戶驗證）
-                error_result = publisher.process_push_message(
-                    user_id,
-                    TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
-                )
-                # 注意：背景處理中如果用戶無效，只能記錄 JSON 結果
-                if error_result:
-                    print(f"背景處理時用戶無效，JSON 回應: {error_result}")
+                # 處理錯誤訊息
+                if is_group:
+                    # 群組聊天：使用 reply_message 回覆錯誤到群組
+                    publisher.line_bot_api.reply_message(
+                        reply_token,
+                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
+                    )
+                    print(f"群組聊天：處理錯誤，已回覆到群組")
+                else:
+                    # 個人聊天：使用 push_message 發送錯誤到個人
+                    error_result = publisher.process_push_message(
+                        user_id,
+                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}"),
+                        event
+                    )
+                    if error_result:
+                        print(f"個人聊天：背景處理時用戶無效，JSON 回應: {error_result}")
             finally:
                 # 處理完成後清除用戶狀態
                 user_state_manager.clear_state(user_id)
@@ -563,7 +650,8 @@ def handle_image_message(event):
         result = publisher.process_reply_message(
             reply_token,
             TextSendMessage(text=f"發生錯誤: {str(e)}"),
-            user_id
+            user_id,
+            event
         )
         if result:  # 如果回傳錯誤 JSON
             return result

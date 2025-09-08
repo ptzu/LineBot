@@ -110,9 +110,24 @@ class LineBotTester:
         # LINE Bot SDK 期望 Base64 編碼的簽名
         return base64.b64encode(signature).decode('utf-8')
     
-    def send_text_message(self, user_id="test_local_user_12345_invalid", text="Hello Bot!"):
+    def send_text_message(self, user_id="test_local_user_12345_invalid", text="Hello Bot!", source_type="user", group_id=None):
         """發送文字訊息"""
         print(f"📤 發送文字訊息: {text}")
+        print(f"   來源類型: {source_type}")
+        if group_id:
+            print(f"   群組 ID: {group_id}")
+        
+        # 建立 source 物件
+        source = {
+            "type": source_type,
+            "userId": user_id
+        }
+        
+        # 如果是群組或房間，添加相應的 ID
+        if source_type == "group" and group_id:
+            source["groupId"] = group_id
+        elif source_type == "room" and group_id:
+            source["roomId"] = group_id
         
         # 模擬 LINE 訊息格式
         webhook_event = {
@@ -121,10 +136,7 @@ class LineBotTester:
                     "type": "message",
                     "mode": "active",
                     "timestamp": int(time.time() * 1000),
-                    "source": {
-                        "type": "user",
-                        "userId": user_id
-                    },
+                    "source": source,
                     "webhookEventId": "test_event_id",
                     "deliveryContext": {
                         "isRedelivery": False
@@ -199,6 +211,39 @@ class LineBotTester:
         time.sleep(0.5)
         
         print("\n✅ 基本功能測試完成")
+    
+    def test_group_functions(self):
+        """測試群組功能"""
+        print("\n🧪 開始測試群組功能...")
+        
+        # 測試 1: 群組中的功能選單
+        print("\n📤 測試 1: 群組中的功能選單")
+        self.send_text_message(
+            text="!功能", 
+            source_type="group", 
+            group_id="test_group_12345"
+        )
+        time.sleep(0.5)
+        
+        # 測試 2: 群組中的圖片彩色化
+        print("\n📤 測試 2: 群組中的圖片彩色化")
+        self.send_text_message(
+            text="圖片彩色化", 
+            source_type="group", 
+            group_id="test_group_12345"
+        )
+        time.sleep(0.5)
+        
+        # 測試 3: 房間中的使用說明
+        print("\n📤 測試 3: 房間中的使用說明")
+        self.send_text_message(
+            text="使用說明", 
+            source_type="room", 
+            group_id="test_room_67890"
+        )
+        time.sleep(0.5)
+        
+        print("\n✅ 群組功能測試完成")
 
 def main():
     print("🤖 LINE Bot 本地測試器")
@@ -218,9 +263,10 @@ def main():
     print("\n選擇測試模式:")
     print("1. 發送自訂文字訊息")
     print("2. 執行基本功能測試")
-    print("3. 互動模式")
+    print("3. 執行群組功能測試")
+    print("4. 互動模式")
     
-    choice = input("\n請選擇 (1-3): ").strip()
+    choice = input("\n請選擇 (1-4): ").strip()
     
     if choice == "1":
         text = input("請輸入要發送的訊息: ").strip()
@@ -231,6 +277,9 @@ def main():
         tester.test_basic_functions()
     
     elif choice == "3":
+        tester.test_group_functions()
+    
+    elif choice == "4":
         print("\n進入互動模式 (輸入 'quit' 退出):")
         print("💡 每次發送訊息後會顯示 Bot 回應（如果是測試用戶）")
         while True:
