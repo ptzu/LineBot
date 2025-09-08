@@ -398,7 +398,7 @@ def handle_text_message(event):
             result = publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(
-                    text=f"{user_name} 你好\n📸 圖片彩色化功能\n\n請確認是否要進行彩色化處理？\n\n⚠️ 注意：彩色化處理需要消耗 API 點數，請確認後再上傳圖片。",
+                    text=f"{user_name} 你好\n📸 圖片彩色化功能\n\n請確認是否要進行彩色化處理？\n\n⚠️ 注意：彩色化處理需要消耗 1 點數，請確認後再上傳圖片。",
                     quick_reply=quick_reply
                 ),
                 user_id
@@ -411,7 +411,7 @@ def handle_text_message(event):
             if user_state_manager.is_waiting_for_colorize(user_id):
                 result = publisher.process_reply_message(
                     reply_token,
-                    TextSendMessage(text=f"{user_name} 你好\n✅ 已確認彩色化功能\n\n請上傳一張黑白照片，我將為您進行彩色化處理。\n\n💡 提示：處理完成後狀態會自動重置。"),
+                    TextSendMessage(text=f"{user_name} 你好\n✅ 已確認彩色化功能\n\n請上傳一張黑白照片，我將為您進行彩色化處理。"),
                     user_id
                 )
                 if result:  # 如果回傳 JSON
