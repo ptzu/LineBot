@@ -566,35 +566,14 @@ def handle_image_message(event):
         # 2. 判斷是否為群組聊天
         is_group = event and publisher._is_group_chat(event)
         
-        if is_group:
-            # 群組聊天：先回覆「正在處理...」到群組
-            result = publisher.process_reply_message(
-                reply_token,
-                TextSendMessage(text=f"{user_name} 你好\n正在處理您的圖片，請稍候..."),
-                user_id,
-                event
-            )
-            if result:  # 如果回傳錯誤 JSON
-                return result
-        else:
-            # 個人聊天：先回覆「正在處理...」到個人
-            result = publisher.process_reply_message(
-                reply_token,
-                TextSendMessage(text=f"{user_name} 你好\n正在處理您的圖片，請稍候..."),
-                user_id,
-                event
-            )
-            if result:  # 如果回傳錯誤 JSON
-                return result
-
-        # 3. 在背景執行彩色化處理
+        # 3. 在背景執行彩色化處理，不先回覆任何訊息
         def process_image_async():
             try:
                 output_url = colorize_image(image_bytes)
                 
                 if is_group:
                     # 群組聊天：使用 reply_message 回覆到群組
-                    # 注意：reply_token 有時效性，但通常足夠處理圖片
+                    # 注意：reply_token 只能使用一次，所以不先回覆「正在處理...」
                     publisher.line_bot_api.reply_message(
                         reply_token,
                         ImageSendMessage(
@@ -620,11 +599,20 @@ def handle_image_message(event):
                 # 處理錯誤訊息
                 if is_group:
                     # 群組聊天：使用 reply_message 回覆錯誤到群組
-                    publisher.line_bot_api.reply_message(
-                        reply_token,
-                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
-                    )
-                    print(f"群組聊天：處理錯誤，已回覆到群組")
+                    # 注意：如果成功處理時已經用了 reply_token，這裡會失敗
+                    try:
+                        publisher.line_bot_api.reply_message(
+                            reply_token,
+                            TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
+                        )
+                        print(f"群組聊天：處理錯誤，已回覆到群組")
+                    except Exception as reply_error:
+                        # reply_token 已使用過，改用 push_message 發送到個人
+                        print(f"群組聊天：reply_token 已使用，改用 push_message 發送錯誤到個人: {reply_error}")
+                        publisher.line_bot_api.push_message(
+                            user_id,
+                            TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
+                        )
                 else:
                     # 個人聊天：使用 push_message 發送錯誤到個人
                     error_result = publisher.process_push_message(
