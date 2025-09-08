@@ -1,0 +1,9 @@
+# LINE Bot 設定
+CHANNEL_ACCESS_TOKEN=your_line_channel_access_token_here
+CHANNEL_SECRET=your_line_channel_secret_here
+
+# Replicate API 設定
+REPLICATE_API_TOKEN=your_replicate_api_token_here
+
+# 應用程式設定
+PORT=5000

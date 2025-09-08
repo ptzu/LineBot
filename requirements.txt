@@ -3,3 +3,4 @@ line-bot-sdk
 requests
 replicate
 gunicorn==21.2.0
+python-dotenv
