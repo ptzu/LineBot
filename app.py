@@ -15,6 +15,41 @@ from linebot.models import (
     TextSendMessage, ImageSendMessage, QuickReply, QuickReplyButton, MessageAction
 )
 
+class UserStateManager:
+    """用戶狀態管理器，追蹤每個用戶的當前狀態"""
+    
+    def __init__(self):
+        # 用戶狀態字典：{user_id: state}
+        # 狀態類型：
+        # - None: 無特殊狀態
+        # - "waiting_for_colorize": 等待彩色化確認
+        # - "colorizing": 正在進行彩色化處理
+        self.user_states = {}
+    
+    def set_state(self, user_id, state):
+        """設定用戶狀態"""
+        self.user_states[user_id] = state
+        print(f"用戶 {user_id} 狀態設為: {state}")
+    
+    def get_state(self, user_id):
+        """獲取用戶狀態"""
+        return self.user_states.get(user_id, None)
+    
+    def clear_state(self, user_id):
+        """清除用戶狀態"""
+        if user_id in self.user_states:
+            old_state = self.user_states[user_id]
+            del self.user_states[user_id]
+            print(f"用戶 {user_id} 狀態已清除 (原狀態: {old_state})")
+    
+    def is_waiting_for_colorize(self, user_id):
+        """檢查用戶是否在等待彩色化確認"""
+        return self.get_state(user_id) == "waiting_for_colorize"
+    
+    def is_colorizing(self, user_id):
+        """檢查用戶是否正在進行彩色化處理"""
+        return self.get_state(user_id) == "colorizing"
+
 class MessagePublisher:
     """統一的訊息發送器，負責用戶驗證和訊息發送"""
     
@@ -269,6 +304,9 @@ handler = WebhookHandler(os.getenv("CHANNEL_SECRET"))
 # 創建統一的訊息發送器
 publisher = MessagePublisher(line_bot_api)
 
+# 創建用戶狀態管理器
+user_state_manager = UserStateManager()
+
 # 設定 Replicate API token
 os.environ["REPLICATE_API_TOKEN"] = os.getenv("REPLICATE_API_TOKEN")
 
@@ -346,9 +384,54 @@ def handle_text_message(event):
                 return result
                 
         elif user_message == "圖片彩色化":
+            # 設定用戶狀態為等待彩色化確認
+            user_state_manager.set_state(user_id, "waiting_for_colorize")
+            
+            # 提供確認選項
+            quick_reply_buttons = [
+                QuickReplyButton(action=MessageAction(label="✅ 確認彩色化", text="確認彩色化")),
+                QuickReplyButton(action=MessageAction(label="❌ 取消", text="取消彩色化")),
+            ]
+            
+            quick_reply = QuickReply(items=quick_reply_buttons)
+            
             result = publisher.process_reply_message(
                 reply_token,
-                TextSendMessage(text=f"{user_name} 你好\n📸 圖片彩色化功能\n\n請上傳一張黑白照片，我將為您進行彩色化處理。"),
+                TextSendMessage(
+                    text=f"{user_name} 你好\n📸 圖片彩色化功能\n\n請確認是否要進行彩色化處理？\n\n⚠️ 注意：彩色化處理需要消耗 API 點數，請確認後再上傳圖片。",
+                    quick_reply=quick_reply
+                ),
+                user_id
+            )
+            if result:  # 如果回傳 JSON
+                return result
+                
+        elif user_message == "確認彩色化":
+            # 檢查用戶是否在等待彩色化狀態
+            if user_state_manager.is_waiting_for_colorize(user_id):
+                result = publisher.process_reply_message(
+                    reply_token,
+                    TextSendMessage(text=f"{user_name} 你好\n✅ 已確認彩色化功能\n\n請上傳一張黑白照片，我將為您進行彩色化處理。\n\n💡 提示：處理完成後狀態會自動重置。"),
+                    user_id
+                )
+                if result:  # 如果回傳 JSON
+                    return result
+            else:
+                result = publisher.process_reply_message(
+                    reply_token,
+                    TextSendMessage(text=f"{user_name} 你好\n❌ 您目前沒有等待確認的彩色化請求\n\n請先輸入「圖片彩色化」來啟動功能。"),
+                    user_id
+                )
+                if result:  # 如果回傳 JSON
+                    return result
+                    
+        elif user_message == "取消彩色化":
+            # 清除用戶狀態
+            user_state_manager.clear_state(user_id)
+            
+            result = publisher.process_reply_message(
+                reply_token,
+                TextSendMessage(text=f"{user_name} 你好\n❌ 已取消彩色化功能\n\n如需使用其他功能，請輸入「!功能」查看選單。"),
                 user_id
             )
             if result:  # 如果回傳 JSON
@@ -416,7 +499,16 @@ def handle_image_message(event):
     except Exception as e:
         print(f"無法獲取用戶名稱：{str(e)}")
     
+    # 檢查用戶狀態，只有確認彩色化後才處理圖片
+    if not user_state_manager.is_waiting_for_colorize(user_id):
+        # 用戶沒有確認彩色化，靜默處理，不發送任何回覆
+        print(f"用戶 {user_id} 上傳圖片但未確認彩色化功能，靜默處理")
+        return  # 不處理圖片，不發送回覆，直接結束
+    
     try:
+        # 設定狀態為正在彩色化
+        user_state_manager.set_state(user_id, "colorizing")
+        
         # 1. 從 LINE 下載圖片
         message_content = line_bot_api.get_message_content(message_id)
         image_bytes = b''.join(chunk for chunk in message_content.iter_content())
@@ -455,12 +547,19 @@ def handle_image_message(event):
                 # 注意：背景處理中如果用戶無效，只能記錄 JSON 結果
                 if error_result:
                     print(f"背景處理時用戶無效，JSON 回應: {error_result}")
+            finally:
+                # 處理完成後清除用戶狀態
+                user_state_manager.clear_state(user_id)
+                print(f"用戶 {user_id} 彩色化處理完成，狀態已重置")
 
         # 啟動背景執行緒
         thread = threading.Thread(target=process_image_async)
         thread.start()
 
     except Exception as e:
+        # 發生錯誤時也要清除狀態
+        user_state_manager.clear_state(user_id)
+        
         result = publisher.process_reply_message(
             reply_token,
             TextSendMessage(text=f"發生錯誤: {str(e)}"),
