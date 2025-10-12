@@ -58,13 +58,18 @@ class LocalTestStarter:
         """啟動 Flask 應用程式"""
         print("🚀 啟動 Flask 應用程式...")
         
+        # 設定開發模式環境變數
+        env = os.environ.copy()
+        env["FLASK_DEBUG"] = "true"
+        
         try:
             self.flask_process = subprocess.Popen(
                 ["python", "../app.py"],
                 # 移除輸出重定向，讓 Flask 輸出直接顯示
                 # stdout=subprocess.PIPE,
                 # stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                env=env
             )
             
             print(f"✅ Flask 進程已啟動 (PID: {self.flask_process.pid})")
@@ -194,7 +199,8 @@ class LocalTestStarter:
             print("現在你可以:")
             print("1. 用手機 LINE App 掃描 QR Code 加入你的 Bot")
             print("2. 執行 python test/test_local.py 進行本地測試")
-            print("3. 按 Ctrl+C 停止測試環境")
+            print("3. 修改程式碼時 Flask 會自動重載，無需手動重啟")
+            print("4. 按 Ctrl+C 停止測試環境")
             
             # 保持運行
             try:
