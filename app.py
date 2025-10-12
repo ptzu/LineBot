@@ -83,10 +83,16 @@ def main():
     # 啟動 Flask 應用程式
     print("🌐 啟動 Flask 伺服器...")
     port = int(os.getenv("PORT", 5000))
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    
+    if debug_mode:
+        print("🔧 開發模式已啟用 - 程式碼變更時會自動重載")
+        print("⚠️  注意：開發模式僅用於本地開發，生產環境請關閉")
+    
     print(f"📍 服務運行在: http://0.0.0.0:{port}")
     print("=" * 50)
     
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
