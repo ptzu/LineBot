@@ -106,9 +106,10 @@ def main():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    # 確保已初始化（生產環境自動初始化）
+    # 如果模組載入時初始化失敗，在這裡重試一次
     if not _initialized:
         try:
+            print("🔄 重試初始化...")
             init()
         except Exception as e:
             print(f"❌ 初始化失敗: {str(e)}")
@@ -174,6 +175,25 @@ def handle_image_message(event):
         import traceback
         traceback.print_exc()
         return None
+
+# 模組載入時自動初始化（適用於生產環境）
+def _auto_init():
+    """在模組載入時自動初始化，如果環境變數可用的話"""
+    try:
+        # 檢查是否有必要的環境變數
+        if (os.getenv("CHANNEL_ACCESS_TOKEN") and 
+            os.getenv("CHANNEL_SECRET") and 
+            os.getenv("REPLICATE_API_TOKEN")):
+            print("🔄 檢測到生產環境，開始自動初始化...")
+            init()
+        else:
+            print("ℹ️  環境變數未完整設定，跳過自動初始化（適用於開發環境）")
+    except Exception as e:
+        print(f"⚠️  自動初始化失敗: {str(e)}")
+        print("ℹ️  將在第一次請求時重試初始化")
+
+# 執行自動初始化
+_auto_init()
 
 if __name__ == "__main__":
     main()
