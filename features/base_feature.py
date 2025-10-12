@@ -1,0 +1,103 @@
+from abc import ABC, abstractmethod
+from linebot import LineBotApi
+from message_publisher import MessagePublisher
+from user_state_manager import UserStateManager
+
+
+class BaseFeature(ABC):
+    """所有功能的基礎類別"""
+    
+    def __init__(self, line_bot_api: LineBotApi, publisher: MessagePublisher, state_manager: UserStateManager):
+        self.line_bot_api = line_bot_api
+        self.publisher = publisher
+        self.state_manager = state_manager
+    
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """功能名稱，用於識別和狀態管理"""
+        pass
+    
+    @abstractmethod
+    def can_handle(self, message: str, user_id: str) -> bool:
+        """
+        判斷是否能處理此訊息
+        
+        Args:
+            message: 用戶訊息
+            user_id: 用戶 ID
+            
+        Returns:
+            bool: 是否能處理
+        """
+        pass
+    
+    @abstractmethod
+    def handle_text(self, event: dict) -> dict:
+        """
+        處理文字訊息
+        
+        Args:
+            event: LINE webhook event
+            
+        Returns:
+            dict: Flask 回應或 None
+        """
+        pass
+    
+    def handle_image(self, event: dict) -> dict:
+        """
+        處理圖片訊息（預設不處理）
+        
+        Args:
+            event: LINE webhook event
+            
+        Returns:
+            dict: Flask 回應或 None
+        """
+        return None
+    
+    def get_user_name(self, user_id: str) -> str:
+        """獲取用戶名稱"""
+        try:
+            profile = self.line_bot_api.get_profile(user_id)
+            return profile.display_name
+        except Exception as e:
+            print(f"無法獲取用戶名稱：{str(e)}")
+            return "使用者"
+    
+    def get_user_id(self, event: dict) -> str:
+        """從 event 中獲取用戶 ID"""
+        return event.get('source', {}).get('userId', '')
+    
+    def get_reply_token(self, event: dict) -> str:
+        """從 event 中獲取回覆 token"""
+        return event.get('replyToken', '')
+    
+    def get_message_text(self, event: dict) -> str:
+        """從 event 中獲取訊息文字"""
+        return event.get('message', {}).get('text', '')
+    
+    def get_message_id(self, event: dict) -> str:
+        """從 event 中獲取訊息 ID"""
+        return event.get('message', {}).get('id', '')
+    
+    def set_user_state(self, user_id: str, state: str):
+        """設定用戶狀態"""
+        self.state_manager.set_state(user_id, {"feature": self.name, "state": state})
+    
+    def get_user_state(self, user_id: str) -> dict:
+        """獲取用戶狀態"""
+        return self.state_manager.get_state(user_id)
+    
+    def clear_user_state(self, user_id: str):
+        """清除用戶狀態"""
+        self.state_manager.clear_state(user_id)
+    
+    def is_user_in_state(self, user_id: str, state: str) -> bool:
+        """檢查用戶是否在特定狀態"""
+        user_state = self.get_user_state(user_id)
+        if not user_state:
+            return False
+        return (user_state.get("feature") == self.name and 
+                user_state.get("state") == state)

@@ -2,11 +2,9 @@ class UserStateManager:
     """用戶狀態管理器，追蹤每個用戶的當前狀態"""
     
     def __init__(self):
-        # 用戶狀態字典：{user_id: state}
-        # 狀態類型：
-        # - None: 無特殊狀態
-        # - "waiting_for_colorize": 等待彩色化確認
-        # - "colorizing": 正在進行彩色化處理
+        # 用戶狀態字典：{user_id: state_dict}
+        # 狀態格式：{"feature": "colorize", "state": "waiting"}
+        # 或舊格式字串（向後相容）
         self.user_states = {}
     
     def set_state(self, user_id, state):
@@ -26,9 +24,19 @@ class UserStateManager:
             print(f"用戶 {user_id} 狀態已清除 (原狀態: {old_state})")
     
     def is_waiting_for_colorize(self, user_id):
-        """檢查用戶是否在等待彩色化確認"""
-        return self.get_state(user_id) == "waiting_for_colorize"
+        """檢查用戶是否在等待彩色化確認（向後相容）"""
+        state = self.get_state(user_id)
+        if isinstance(state, dict):
+            return (state.get("feature") == "colorize" and 
+                    state.get("state") == "waiting")
+        else:
+            return state == "waiting_for_colorize"
     
     def is_colorizing(self, user_id):
-        """檢查用戶是否正在進行彩色化處理"""
-        return self.get_state(user_id) == "colorizing"
+        """檢查用戶是否正在進行彩色化處理（向後相容）"""
+        state = self.get_state(user_id)
+        if isinstance(state, dict):
+            return (state.get("feature") == "colorize" and 
+                    state.get("state") == "processing")
+        else:
+            return state == "colorizing"
