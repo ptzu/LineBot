@@ -214,22 +214,46 @@ class MessagePublisher:
         self.line_bot_api.reply_message(reply_token, messages)
         return None  # 表示正常處理，不需要特殊回應
     
+    def _get_target_id(self, event):
+        """
+        獲取正確的目標ID（用於推送訊息）
+        
+        Args:
+            event: LINE webhook event
+            
+        Returns:
+            str: 群組ID（群組聊天）或用戶ID（個人聊天）
+        """
+        if not event:
+            return None
+            
+        source = event.get('source', {})
+        source_type = source.get('type', 'user')
+        
+        if source_type == 'group':
+            return source.get('groupId', '')
+        elif source_type == 'room':
+            return source.get('roomId', '')
+        else:  # source_type == 'user'
+            return source.get('userId', '')
+    
     def process_push_message(self, user_id, messages, event=None):
         """
         處理推送訊息，包含用戶驗證和 Flask 回應
         
         Args:
-            user_id: 用戶 ID
+            user_id: 用戶 ID（個人聊天使用）
             messages: 要發送的訊息
             event: LINE webhook event（用於判斷是否為群組聊天）
         
         Returns:
             Flask Response: 包含純訊息的 JSON 回應或 None（表示正常處理）
         """
-        # 如果是群組聊天，跳過用戶驗證
+        # 如果是群組聊天，跳過用戶驗證，使用群組ID推送訊息
         if event and self._is_group_chat(event):
-            print(f"群組聊天，跳過用戶驗證，直接推送訊息")
-            self.line_bot_api.push_message(user_id, messages)
+            target_id = self._get_target_id(event)
+            print(f"群組聊天，跳過用戶驗證，直接推送訊息到: {target_id}")
+            self.line_bot_api.push_message(target_id, messages)
             return None
         
         # 個人聊天才進行用戶驗證

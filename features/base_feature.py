@@ -70,6 +70,36 @@ class BaseFeature(ABC):
         """從 event 中獲取用戶 ID"""
         return event.get('source', {}).get('userId', '')
     
+    def get_group_id(self, event: dict) -> str:
+        """從 event 中獲取群組 ID"""
+        return event.get('source', {}).get('groupId', '')
+    
+    def get_room_id(self, event: dict) -> str:
+        """從 event 中獲取房間 ID"""
+        return event.get('source', {}).get('roomId', '')
+    
+    def get_source_type(self, event: dict) -> str:
+        """從 event 中獲取來源類型"""
+        return event.get('source', {}).get('type', 'user')
+    
+    def get_target_id(self, event: dict) -> str:
+        """
+        獲取正確的目標ID（用於推送訊息）
+        群組聊天時返回群組ID，個人聊天時返回用戶ID
+        """
+        source_type = self.get_source_type(event)
+        if source_type == 'group':
+            return self.get_group_id(event)
+        elif source_type == 'room':
+            return self.get_room_id(event)
+        else:  # source_type == 'user'
+            return self.get_user_id(event)
+    
+    def is_group_chat(self, event: dict) -> bool:
+        """判斷是否為群組聊天"""
+        source_type = self.get_source_type(event)
+        return source_type in ['group', 'room']
+    
     def get_reply_token(self, event: dict) -> str:
         """從 event 中獲取回覆 token"""
         return event.get('replyToken', '')

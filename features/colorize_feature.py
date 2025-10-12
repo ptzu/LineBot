@@ -44,7 +44,7 @@ class ColorizeFeature(BaseFeature):
         
         try:
             if message == "圖片彩色化":
-                return self._handle_colorize_request(reply_token, user_name, user_id)
+                return self._handle_colorize_request(reply_token, user_name, user_id, event)
                 
         except Exception as e:
             print(f"❌ ColorizeFeature handle_text error: {str(e)}")
@@ -80,7 +80,8 @@ class ColorizeFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"{user_name}，我已經收到您的珍貴照片了！✨ 正在為您精心處理中，請稍候片刻 🌟"),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             if result:  # 如果回傳錯誤 JSON
                 return result
@@ -102,7 +103,8 @@ class ColorizeFeature(BaseFeature):
                         ImageSendMessage(
                             original_content_url=output_url,
                             preview_image_url=output_url
-                        )
+                        ),
+                        event  # 傳遞 event 以支援群組聊天
                     )
                     if error_result:
                         print(f"背景處理時用戶無效，JSON 回應: {error_result}")
@@ -111,7 +113,8 @@ class ColorizeFeature(BaseFeature):
                     # 回傳錯誤訊息（載入動畫會自動停止）
                     error_result = self.publisher.process_push_message(
                         user_id,
-                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
+                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}"),
+                        event  # 傳遞 event 以支援群組聊天
                     )
                     if error_result:
                         print(f"背景處理時用戶無效，JSON 回應: {error_result}")
@@ -131,13 +134,14 @@ class ColorizeFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"發生錯誤: {str(e)}"),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             return result
         
         return None
     
-    def _handle_colorize_request(self, reply_token: str, user_name: str, user_id: str) -> dict:
+    def _handle_colorize_request(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理彩色化請求"""
         # 設定用戶狀態為等待圖片
         self.set_user_state(user_id, "waiting")
@@ -147,7 +151,8 @@ class ColorizeFeature(BaseFeature):
             TextSendMessage(
                 text=f"{user_name} 你好！✨\n🎨 圖片彩色化功能\n\n💎 此功能會消耗 1 點點數，讓您的珍貴回憶重現色彩！\n\n請上傳一張黑白照片，我將為您進行彩色化處理，讓回憶重新綻放光彩 🌈"
             ),
-            user_id
+            user_id,
+            event  # 傳遞 event 以支援群組聊天
         )
         return result
     

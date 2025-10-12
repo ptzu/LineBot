@@ -23,11 +23,11 @@ class MenuFeature(BaseFeature):
         
         try:
             if message in ["!功能", "功能", "！功能"]:
-                return self._handle_main_menu(reply_token, user_name, user_id)
+                return self._handle_main_menu(reply_token, user_name, user_id, event)
             elif message == "使用說明":
-                return self._handle_help(reply_token, user_name, user_id)
+                return self._handle_help(reply_token, user_name, user_id, event)
             elif message == "其他功能":
-                return self._handle_other_features(reply_token, user_name, user_id)
+                return self._handle_other_features(reply_token, user_name, user_id, event)
                 
         except Exception as e:
             print(f"❌ MenuFeature handle_text error: {str(e)}")
@@ -36,7 +36,7 @@ class MenuFeature(BaseFeature):
         
         return None
     
-    def _handle_main_menu(self, reply_token: str, user_name: str, user_id: str) -> dict:
+    def _handle_main_menu(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理主功能選單"""
         quick_reply_buttons = [
             QuickReplyButton(action=MessageAction(label="📸 圖片彩色化", text="圖片彩色化")),
@@ -52,11 +52,12 @@ class MenuFeature(BaseFeature):
                 text=f"{user_name} 你好！✨\n🤖 請選擇您想要的功能：",
                 quick_reply=quick_reply
             ),
-            user_id
+            user_id,
+            event  # 傳遞 event 以支援群組聊天
         )
         return result
     
-    def _handle_help(self, reply_token: str, user_name: str, user_id: str) -> dict:
+    def _handle_help(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理使用說明"""
         help_message = f"""{user_name} 你好！✨
 ❓ 使用說明
@@ -82,15 +83,17 @@ class MenuFeature(BaseFeature):
         result = self.publisher.process_reply_message(
             reply_token,
             TextSendMessage(text=help_message),
-            user_id
+            user_id,
+            event  # 傳遞 event 以支援群組聊天
         )
         return result
     
-    def _handle_other_features(self, reply_token: str, user_name: str, user_id: str) -> dict:
+    def _handle_other_features(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理其他功能說明"""
         result = self.publisher.process_reply_message(
             reply_token,
             TextSendMessage(text=f"{user_name} 你好！✨\n🔧 其他功能\n\n更多貼心功能正在精心開發中，敬請期待！🌟\n\n目前為您提供的服務：\n• 🎨 圖片彩色化\n• 🖼️ 圖片編輯\n• 💬 文字對話\n• ❓ 使用說明"),
-            user_id
+            user_id,
+            event  # 傳遞 event 以支援群組聊天
         )
         return result

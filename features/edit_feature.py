@@ -44,11 +44,11 @@ class EditFeature(BaseFeature):
         
         try:
             if message == "圖片編輯":
-                return self._handle_edit_request(reply_token, user_name, user_id)
+                return self._handle_edit_request(reply_token, user_name, user_id, event)
             
             # 檢查用戶是否在等待編輯描述狀態
             if self.is_user_in_state(user_id, "waiting_description"):
-                return self._handle_description_input(reply_token, user_name, user_id, message)
+                return self._handle_description_input(reply_token, user_name, user_id, message, event)
                 
         except Exception as e:
             print(f"❌ EditFeature handle_text error: {str(e)}")
@@ -88,7 +88,8 @@ class EditFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"{user_name}，我已經收到您的圖片了！📷✨\n\n請告訴我您希望如何編輯這張圖片？例如：\n• 將背景改成海灘\n• 把天空變成夕陽\n• 添加彩虹效果\n• 讓人物穿上紅色衣服\n\n請輸入您的編輯描述："),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             return result
 
@@ -99,13 +100,14 @@ class EditFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}"),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             return result
         
         return None
     
-    def _handle_edit_request(self, reply_token: str, user_name: str, user_id: str) -> dict:
+    def _handle_edit_request(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理圖片編輯請求"""
         # 設定用戶狀態為等待圖片
         self.set_user_state(user_id, "waiting_image")
@@ -115,11 +117,12 @@ class EditFeature(BaseFeature):
             TextSendMessage(
                 text=f"{user_name} 你好！✨\n🎨 圖片編輯功能\n\n💎 此功能會消耗 1 點點數，讓您的圖片煥然一新！\n\n請先上傳一張您想要編輯的圖片，然後我會請您描述想要的編輯效果 🖼️"
             ),
-            user_id
+            user_id,
+            event  # 傳遞 event 以支援群組聊天
         )
         return result
     
-    def _handle_description_input(self, reply_token: str, user_name: str, user_id: str, description: str) -> dict:
+    def _handle_description_input(self, reply_token: str, user_name: str, user_id: str, description: str, event: dict) -> dict:
         """處理編輯描述輸入"""
         try:
             # 獲取暫存的圖片數據
@@ -131,7 +134,8 @@ class EditFeature(BaseFeature):
                 return self.publisher.process_reply_message(
                     reply_token,
                     TextSendMessage(text="找不到您上傳的圖片，請重新開始圖片編輯流程。"),
-                    user_id
+                    user_id,
+                    event  # 傳遞 event 以支援群組聊天
                 )
             
             # 設定狀態為正在處理，保留圖片數據和描述
@@ -146,7 +150,8 @@ class EditFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"{user_name}，我已經收到您的編輯需求！🎨\n\n編輯描述：「{description}」\n\n正在為您精心處理中，請稍候片刻 ✨"),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             if result:  # 如果回傳錯誤 JSON
                 return result
@@ -172,7 +177,8 @@ class EditFeature(BaseFeature):
                     if not image_data or not description:
                         error_result = self.publisher.process_push_message(
                             user_id,
-                            TextSendMessage(text="處理過程中遺失了圖片或描述資料，請重新開始。")
+                            TextSendMessage(text="處理過程中遺失了圖片或描述資料，請重新開始。"),
+                            event  # 傳遞 event 以支援群組聊天
                         )
                         if error_result:
                             print(f"背景處理時用戶無效，JSON 回應: {error_result}")
@@ -190,7 +196,8 @@ class EditFeature(BaseFeature):
                         ImageSendMessage(
                             original_content_url=output_url,
                             preview_image_url=output_url
-                        )
+                        ),
+                        event  # 傳遞 event 以支援群組聊天
                     )
                     if error_result:
                         print(f"背景處理時用戶無效，JSON 回應: {error_result}")
@@ -199,7 +206,8 @@ class EditFeature(BaseFeature):
                     # 回傳錯誤訊息（載入動畫會自動停止）
                     error_result = self.publisher.process_push_message(
                         user_id,
-                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}")
+                        TextSendMessage(text=f"處理圖片時發生錯誤: {str(e)}"),
+                        event  # 傳遞 event 以支援群組聊天
                     )
                     if error_result:
                         print(f"背景處理時用戶無效，JSON 回應: {error_result}")
@@ -219,7 +227,8 @@ class EditFeature(BaseFeature):
             result = self.publisher.process_reply_message(
                 reply_token,
                 TextSendMessage(text=f"發生錯誤: {str(e)}"),
-                user_id
+                user_id,
+                event  # 傳遞 event 以支援群組聊天
             )
             return result
         
