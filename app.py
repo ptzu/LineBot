@@ -7,6 +7,7 @@ from user_state_manager import UserStateManager
 from features.feature_registry import FeatureRegistry
 from features.menu_feature import MenuFeature
 from features.colorize_feature import ColorizeFeature
+from features.edit_feature import EditFeature
 
 # 全域變數
 app = Flask(__name__)
@@ -61,9 +62,11 @@ def init():
     print("🔧 註冊功能模組...")
     menu_feature = MenuFeature(line_bot_api, publisher, user_state_manager)
     colorize_feature = ColorizeFeature(line_bot_api, publisher, user_state_manager)
+    edit_feature = EditFeature(line_bot_api, publisher, user_state_manager)
     
     feature_registry.register(menu_feature)
     feature_registry.register(colorize_feature)
+    feature_registry.register(edit_feature)
     
     print(f"✅ 已註冊 {len(feature_registry.get_all_features())} 個功能:")
     for feature in feature_registry.get_all_features():
