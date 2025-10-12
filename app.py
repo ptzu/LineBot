@@ -16,10 +16,15 @@ handler = None
 publisher = None
 user_state_manager = None
 feature_registry = None
+_initialized = False
 
 def init():
     """初始化所有 LINE Bot 相關組件"""
-    global app, line_bot_api, handler, publisher, user_state_manager, feature_registry
+    global app, line_bot_api, handler, publisher, user_state_manager, feature_registry, _initialized
+    
+    # 如果已經初始化過，直接返回
+    if _initialized:
+        return
     
     print("🚀 正在初始化 LINE Bot...")
     
@@ -72,6 +77,8 @@ def init():
     for feature in feature_registry.get_all_features():
         print(f"   - {feature.name}")
     
+    # 標記為已初始化
+    _initialized = True
     print("🎉 LINE Bot 初始化完成！")
 
 def main():
@@ -99,6 +106,21 @@ def main():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # 確保已初始化（生產環境自動初始化）
+    if not _initialized:
+        try:
+            init()
+        except Exception as e:
+            print(f"❌ 初始化失敗: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            abort(500)
+    
+    # 檢查關鍵組件是否已正確初始化
+    if handler is None:
+        print("❌ Handler 未初始化")
+        abort(500)
+    
     signature = request.headers.get("X-Line-Signature")
     body = request.get_data(as_text=True)
     try:
