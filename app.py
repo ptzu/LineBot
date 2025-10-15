@@ -8,6 +8,9 @@ from features.feature_registry import FeatureRegistry
 from features.menu_feature import MenuFeature
 from features.colorize_feature import ColorizeFeature
 from features.edit_feature import EditFeature
+from features.member_feature import MemberFeature
+from models.database import init_database, create_tables
+from services.member_service import MemberService
 
 # 全域變數
 app = Flask(__name__)
@@ -16,11 +19,12 @@ handler = None
 publisher = None
 user_state_manager = None
 feature_registry = None
+member_service = None
 _initialized = False
 
 def init():
     """初始化所有 LINE Bot 相關組件"""
-    global app, line_bot_api, handler, publisher, user_state_manager, feature_registry, _initialized
+    global app, line_bot_api, handler, publisher, user_state_manager, feature_registry, member_service, _initialized
     
     # 如果已經初始化過，直接返回
     if _initialized:
@@ -42,36 +46,68 @@ def init():
     print("🌐 Flask 應用程式已準備就緒")
     print("✅ Flask 應用程式初始化完成")
     
-    # 3. 初始化 LINE Bot API
+    # 3. 初始化資料庫（如果有設定 DATABASE_URL）
+    if os.getenv("DATABASE_URL"):
+        print("🗄️  初始化資料庫連線...")
+        try:
+            init_database()
+            # 不自動建立表格，需要手動執行 scripts/init_db.py
+            print("✅ 資料庫連線初始化完成")
+            print("ℹ️  如需建立表格，請執行: python scripts/init_db.py")
+        except Exception as e:
+            print(f"⚠️  資料庫初始化失敗: {str(e)}")
+            print("ℹ️  會員功能將無法使用")
+    else:
+        print("ℹ️  未設定 DATABASE_URL，會員功能將不可用")
+    
+    # 4. 初始化 LINE Bot API
     print("🤖 初始化 LINE Bot API...")
     line_bot_api = LineBotApi(os.getenv("CHANNEL_ACCESS_TOKEN"))
     handler = WebhookHandler(os.getenv("CHANNEL_SECRET"))
     print("✅ LINE Bot API 初始化完成")
     
-    # 4. 創建統一的訊息發送器
+    # 5. 創建統一的訊息發送器
     print("📤 初始化訊息發送器...")
     publisher = MessagePublisher(line_bot_api)
     print("✅ 訊息發送器初始化完成")
     
-    # 5. 創建用戶狀態管理器
+    # 6. 創建用戶狀態管理器
     print("👤 初始化用戶狀態管理器...")
     user_state_manager = UserStateManager()
     print("✅ 用戶狀態管理器初始化完成")
     
-    # 6. 創建功能註冊表
+    # 7. 創建會員服務（如果資料庫可用）
+    if os.getenv("DATABASE_URL"):
+        print("👥 初始化會員服務...")
+        try:
+            member_service = MemberService()
+            print("✅ 會員服務初始化完成")
+        except Exception as e:
+            print(f"⚠️  會員服務初始化失敗: {str(e)}")
+            member_service = None
+    else:
+        member_service = None
+    
+    # 8. 創建功能註冊表
     print("📝 初始化功能註冊表...")
     feature_registry = FeatureRegistry()
     print("✅ 功能註冊表初始化完成")
     
-    # 7. 註冊所有功能
+    # 9. 註冊所有功能
     print("🔧 註冊功能模組...")
-    menu_feature = MenuFeature(line_bot_api, publisher, user_state_manager)
-    colorize_feature = ColorizeFeature(line_bot_api, publisher, user_state_manager)
-    edit_feature = EditFeature(line_bot_api, publisher, user_state_manager)
+    menu_feature = MenuFeature(line_bot_api, publisher, user_state_manager, member_service)
+    colorize_feature = ColorizeFeature(line_bot_api, publisher, user_state_manager, member_service)
+    edit_feature = EditFeature(line_bot_api, publisher, user_state_manager, member_service)
     
     feature_registry.register(menu_feature)
     feature_registry.register(colorize_feature)
     feature_registry.register(edit_feature)
+    
+    # 註冊會員功能（如果會員服務可用）
+    if member_service:
+        member_feature = MemberFeature(line_bot_api, publisher, user_state_manager, member_service)
+        feature_registry.register(member_feature)
+        print("✅ 會員功能已啟用")
     
     print(f"✅ 已註冊 {len(feature_registry.get_all_features())} 個功能:")
     for feature in feature_registry.get_all_features():

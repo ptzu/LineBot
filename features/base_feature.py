@@ -7,10 +7,11 @@ from user_state_manager import UserStateManager
 class BaseFeature(ABC):
     """所有功能的基礎類別"""
     
-    def __init__(self, line_bot_api: LineBotApi, publisher: MessagePublisher, state_manager: UserStateManager):
+    def __init__(self, line_bot_api: LineBotApi, publisher: MessagePublisher, state_manager: UserStateManager, member_service=None):
         self.line_bot_api = line_bot_api
         self.publisher = publisher
         self.state_manager = state_manager
+        self.member_service = member_service
     
     @property
     @abstractmethod
