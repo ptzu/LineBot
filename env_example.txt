@@ -16,3 +16,6 @@ DATABASE_URL=postgresql://user:password@host:port/dbname
 # Feature Point Costs 功能點數費用
 COLORIZE_COST=10
 EDIT_COST=5
+
+# Member Registration 會員註冊設定
+WELCOME_POINTS=50

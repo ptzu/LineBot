@@ -22,23 +22,46 @@ class MemberFeature(BaseFeature):
         user_name = self.get_user_name(user_id)
         
         if message == "點數":
-            return self._handle_points_query(user_id, user_name, reply_token)
+            return self._handle_points_query(user_id, user_name, reply_token, event)
         elif message == "歷史":
-            return self._handle_history_query(user_id, user_name, reply_token)
+            return self._handle_history_query(user_id, user_name, reply_token, event)
         elif message in ["會員資訊", "會員"]:
-            return self._handle_member_info(user_id, user_name, reply_token)
+            return self._handle_member_info(user_id, user_name, reply_token, event)
         
         return None
     
-    def _handle_points_query(self, user_id: str, user_name: str, reply_token: str):
+    def _handle_points_query(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理點數查詢"""
         try:
-            # 取得或建立會員
-            member = self.member_service.get_or_create_member(user_id, user_name)
+            from models.database import get_session
+            from models.member import Member
             
-            if not member:
-                self.publisher.reply_text(reply_token, "❌ 無法取得會員資訊，請稍後再試")
-                return "OK"
+            with get_session() as session:
+                # 直接在當前 session 中查詢或創建會員
+                member = session.query(Member).filter_by(user_id=user_id).first()
+                
+                if not member:
+                    # 建立新會員（初始點數 0）
+                    member = Member(
+                        user_id=user_id,
+                        display_name=user_name or "使用者",
+                        points=0,
+                        status='normal'
+                    )
+                    session.add(member)
+                    session.commit()
+                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
+                else:
+                    # 會員已存在，更新顯示名稱（如果有提供）
+                    if user_name and member.display_name != user_name:
+                        member.display_name = user_name
+                        session.commit()
+                        print(f"✅ 會員資訊已更新: {user_id}")
+                
+                # 在 session 內提取所需的屬性值
+                display_name = member.display_name
+                points = member.points
+                status = member.status
             
             # 狀態顯示
             status_map = {
@@ -47,7 +70,7 @@ class MemberFeature(BaseFeature):
                 'suspended': '停用',
                 'banned': '黑名單'
             }
-            status_text = status_map.get(member.status, member.status)
+            status_text = status_map.get(status, status)
             
             # 狀態表情符號
             status_emoji = {
@@ -56,36 +79,57 @@ class MemberFeature(BaseFeature):
                 'suspended': '⚠️',
                 'banned': '🚫'
             }
-            emoji = status_emoji.get(member.status, '❓')
+            emoji = status_emoji.get(status, '❓')
             
             response = f"""💰 點數查詢
 
-👤 {member.display_name}
-💎 剩餘點數：{member.points} 點
+👤 {display_name}
+💎 剩餘點數：{points} 點
 {emoji} 會員狀態：{status_text}
 
 輸入「歷史」查看交易記錄
 輸入「會員資訊」查看完整資料"""
             
-            self.publisher.reply_text(reply_token, response)
+            self.publisher.reply_text(reply_token, response, user_id, event)
             return "OK"
             
         except Exception as e:
             print(f"❌ 查詢點數失敗: {str(e)}")
             import traceback
             traceback.print_exc()
-            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試")
+            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試", user_id, event)
             return "OK"
     
-    def _handle_history_query(self, user_id: str, user_name: str, reply_token: str):
+    def _handle_history_query(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理交易記錄查詢"""
         try:
-            # 取得或建立會員
-            member = self.member_service.get_or_create_member(user_id, user_name)
+            from models.database import get_session
+            from models.member import Member
             
-            if not member:
-                self.publisher.reply_text(reply_token, "❌ 無法取得會員資訊，請稍後再試")
-                return "OK"
+            with get_session() as session:
+                # 直接在當前 session 中查詢或創建會員
+                member = session.query(Member).filter_by(user_id=user_id).first()
+                
+                if not member:
+                    # 建立新會員（初始點數 0）
+                    member = Member(
+                        user_id=user_id,
+                        display_name=user_name or "使用者",
+                        points=0,
+                        status='normal'
+                    )
+                    session.add(member)
+                    session.commit()
+                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
+                else:
+                    # 會員已存在，更新顯示名稱（如果有提供）
+                    if user_name and member.display_name != user_name:
+                        member.display_name = user_name
+                        session.commit()
+                        print(f"✅ 會員資訊已更新: {user_id}")
+                
+                # 在 session 內提取點數
+                current_points = member.points
             
             # 查詢交易記錄
             transactions = self.member_service.get_point_history(user_id, limit=10)
@@ -95,8 +139,8 @@ class MemberFeature(BaseFeature):
 
 目前沒有任何交易記錄
 
-💎 目前點數：{member.points} 點"""
-                self.publisher.reply_text(reply_token, response)
+💎 目前點數：{current_points} 點"""
+                self.publisher.reply_text(reply_token, response, user_id, event)
                 return "OK"
             
             # 組合回應訊息
@@ -127,28 +171,52 @@ class MemberFeature(BaseFeature):
                 line = f"{time_str} {type_str}\n{points_str} 點 → 餘額 {trans['balance_after']} 點\n說明：{desc}\n"
                 response_lines.append(line)
             
-            response_lines.append(f"\n💎 目前點數：{member.points} 點")
+            response_lines.append(f"\n💎 目前點數：{current_points} 點")
             response = "\n".join(response_lines)
             
-            self.publisher.reply_text(reply_token, response)
+            self.publisher.reply_text(reply_token, response, user_id, event)
             return "OK"
             
         except Exception as e:
             print(f"❌ 查詢交易記錄失敗: {str(e)}")
             import traceback
             traceback.print_exc()
-            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試")
+            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試", user_id, event)
             return "OK"
     
-    def _handle_member_info(self, user_id: str, user_name: str, reply_token: str):
+    def _handle_member_info(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理會員資訊查詢"""
         try:
-            # 取得或建立會員
-            member = self.member_service.get_or_create_member(user_id, user_name)
+            from models.database import get_session
+            from models.member import Member
             
-            if not member:
-                self.publisher.reply_text(reply_token, "❌ 無法取得會員資訊，請稍後再試")
-                return "OK"
+            with get_session() as session:
+                # 直接在當前 session 中查詢或創建會員
+                member = session.query(Member).filter_by(user_id=user_id).first()
+                
+                if not member:
+                    # 建立新會員（初始點數 0）
+                    member = Member(
+                        user_id=user_id,
+                        display_name=user_name or "使用者",
+                        points=0,
+                        status='normal'
+                    )
+                    session.add(member)
+                    session.commit()
+                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
+                else:
+                    # 會員已存在，更新顯示名稱（如果有提供）
+                    if user_name and member.display_name != user_name:
+                        member.display_name = user_name
+                        session.commit()
+                        print(f"✅ 會員資訊已更新: {user_id}")
+                
+                # 在 session 內提取所需的屬性值
+                display_name = member.display_name
+                points = member.points
+                status = member.status
+                created_at = member.created_at
             
             # 狀態顯示
             status_map = {
@@ -157,29 +225,29 @@ class MemberFeature(BaseFeature):
                 'suspended': '停用',
                 'banned': '黑名單'
             }
-            status_text = status_map.get(member.status, member.status)
+            status_text = status_map.get(status, status)
             
             # 格式化日期
-            created_at = member.created_at.strftime("%Y/%m/%d %H:%M") if member.created_at else "未知"
+            created_at_str = created_at.strftime("%Y/%m/%d %H:%M") if created_at else "未知"
             
             response = f"""👤 會員資訊
 
-📝 姓名：{member.display_name}
+📝 姓名：{display_name}
 🆔 ID：{user_id[:8]}...
-💎 剩餘點數：{member.points} 點
+💎 剩餘點數：{points} 點
 📊 會員狀態：{status_text}
-📅 註冊日期：{created_at}
+📅 註冊日期：{created_at_str}
 
 輸入「點數」查看點數
 輸入「歷史」查看交易記錄"""
             
-            self.publisher.reply_text(reply_token, response)
+            self.publisher.reply_text(reply_token, response, user_id, event)
             return "OK"
             
         except Exception as e:
             print(f"❌ 查詢會員資訊失敗: {str(e)}")
             import traceback
             traceback.print_exc()
-            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試")
+            self.publisher.reply_text(reply_token, "❌ 查詢失敗，請稍後再試", user_id, event)
             return "OK"
 

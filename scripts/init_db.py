@@ -45,6 +45,19 @@ def main():
         print("✅ 資料庫連線成功")
         print()
         
+        # 測試連線穩定性
+        print("🔍 測試連線穩定性...")
+        try:
+            with engine.connect() as conn:
+                from sqlalchemy import text
+                result = conn.execute(text("SELECT version()"))
+                version = result.fetchone()[0]
+                print(f"✅ 資料庫版本：{version[:50]}...")
+        except Exception as e:
+            print(f"⚠️  連線測試失敗：{str(e)}")
+            print("繼續嘗試建立資料表...")
+        print()
+        
         # 建立所有資料表
         print("📊 正在建立資料表...")
         create_tables()
@@ -98,6 +111,17 @@ def main():
         print("  3. 檢查帳號密碼是否正確")
         print("  4. 確認網路連線正常")
         print("  5. 檢查資料庫是否允許遠端連接")
+        print()
+        print("Supabase 特定問題：")
+        print("  - 檢查 Supabase 專案是否暫停（免費版 7 天不使用會暫停）")
+        print("  - 確認密碼中沒有特殊字元需要 URL 編碼")
+        print("  - 檢查 Supabase 專案狀態：https://supabase.com/dashboard")
+        print("  - 嘗試重設資料庫密碼")
+        print()
+        print("診斷資訊：")
+        print(f"  - DATABASE_URL 前綴：{database_url.split('@')[0].split('://')[0] if '://' in database_url else 'N/A'}")
+        print(f"  - 主機位址：{database_url.split('@')[1].split(':')[0] if '@' in database_url else 'N/A'}")
+        print(f"  - 連接埠：{database_url.split(':')[-1].split('/')[0] if ':' in database_url else 'N/A'}")
         print()
         import traceback
         traceback.print_exc()
