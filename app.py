@@ -140,6 +140,41 @@ def main():
     
     app.run(host="0.0.0.0", port=port, debug=debug_mode)
 
+@app.route("/")
+def index():
+    """健康檢查端點"""
+    return {"status": "ok", "message": "LINE Bot is running"}
+
+@app.route("/health/db")
+def health_db():
+    """資料庫連線檢查端點"""
+    try:
+        from models.database import get_engine
+        from sqlalchemy import text
+        
+        engine = get_engine()
+        if not engine:
+            return {"status": "error", "message": "資料庫引擎未初始化"}, 500
+        
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        # 檢查會員服務
+        if member_service:
+            return {
+                "status": "success", 
+                "message": "資料庫連線正常",
+                "member_service": "enabled"
+            }
+        else:
+            return {
+                "status": "warning",
+                "message": "資料庫連線正常但會員服務未啟用",
+                "member_service": "disabled"
+            }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     # 如果模組載入時初始化失敗，在這裡重試一次
