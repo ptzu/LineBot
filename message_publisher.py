@@ -237,6 +237,22 @@ class MessagePublisher:
         else:  # source_type == 'user'
             return source.get('userId', '')
     
+    def reply_text(self, reply_token, text, user_id=None, event=None):
+        """
+        回覆文字訊息的便利方法
+        
+        Args:
+            reply_token: LINE 回覆 token
+            text: 要回覆的文字內容
+            user_id: 用戶 ID（用於驗證）
+            event: LINE webhook event（用於判斷是否為群組聊天）
+        
+        Returns:
+            Flask Response: 包含純訊息的 JSON 回應或 None（表示正常處理）
+        """
+        from linebot.models import TextSendMessage
+        return self.process_reply_message(reply_token, TextSendMessage(text=text), user_id, event)
+    
     def process_push_message(self, user_id, messages, event=None):
         """
         處理推送訊息，包含用戶驗證和 Flask 回應

@@ -7,10 +7,11 @@ from user_state_manager import UserStateManager
 class BaseFeature(ABC):
     """所有功能的基礎類別"""
     
-    def __init__(self, line_bot_api: LineBotApi, publisher: MessagePublisher, state_manager: UserStateManager):
+    def __init__(self, line_bot_api: LineBotApi, publisher: MessagePublisher, state_manager: UserStateManager, member_service=None):
         self.line_bot_api = line_bot_api
         self.publisher = publisher
         self.state_manager = state_manager
+        self.member_service = member_service
     
     @property
     @abstractmethod
@@ -112,9 +113,13 @@ class BaseFeature(ABC):
         """從 event 中獲取訊息 ID"""
         return event.get('message', {}).get('id', '')
     
-    def set_user_state(self, user_id: str, state: str):
+    def set_user_state(self, user_id: str, state: str, data: dict = None):
         """設定用戶狀態"""
-        self.state_manager.set_state(user_id, {"feature": self.name, "state": state})
+        self.state_manager.set_state(user_id, {
+            "feature": self.name, 
+            "state": state,
+            "data": data
+        })
     
     def get_user_state(self, user_id: str) -> dict:
         """獲取用戶狀態"""

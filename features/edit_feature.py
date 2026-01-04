@@ -12,11 +12,12 @@ from linebot.models import TextSendMessage, ImageSendMessage, QuickReply, QuickR
 class EditFeature(BaseFeature):
     """圖片編輯功能處理器"""
     
-    def __init__(self, line_bot_api, publisher, state_manager):
-        super().__init__(line_bot_api, publisher, state_manager)
+    def __init__(self, line_bot_api, publisher, state_manager, member_service=None):
+        super().__init__(line_bot_api, publisher, state_manager, member_service)
         # 設定 Replicate API token
         os.environ["REPLICATE_API_TOKEN"] = os.getenv("REPLICATE_API_TOKEN")
         self.replicate_model = "google/nano-banana"
+        self.required_points = int(os.getenv("EDIT_COST", "5"))
     
     @property
     def name(self) -> str:
@@ -78,9 +79,7 @@ class EditFeature(BaseFeature):
             image_bytes = b''.join(chunk for chunk in message_content.iter_content())
             
             # 2. 設定狀態為等待編輯描述，同時保存圖片數據
-            self.state_manager.set_state(user_id, {
-                "feature": self.name,
-                "state": "waiting_description",
+            self.set_user_state(user_id, "waiting_description", {
                 "image_data": base64.b64encode(image_bytes).decode('utf-8')
             })
             
@@ -109,13 +108,27 @@ class EditFeature(BaseFeature):
     
     def _handle_edit_request(self, reply_token: str, user_name: str, user_id: str, event: dict) -> dict:
         """處理圖片編輯請求"""
+        # 檢查點數（如果有 member_service）
+        if self.member_service:
+            member = self.member_service.get_or_create_member(user_id, user_name)
+            if member['points'] < self.required_points:
+                result = self.publisher.process_reply_message(
+                    reply_token,
+                    TextSendMessage(
+                        text=f"❌ 點數不足！\n\n💎 目前點數：{member['points']} 點\n💰 需要點數：{self.required_points} 點\n\n請輸入「點數」查看詳細資訊"
+                    ),
+                    user_id,
+                    event
+                )
+                return result
+        
         # 設定用戶狀態為等待圖片
         self.set_user_state(user_id, "waiting_image")
         
         result = self.publisher.process_reply_message(
             reply_token,
             TextSendMessage(
-                text=f"{user_name} 你好！✨\n🎨 圖片編輯功能\n\n💎 此功能會消耗 1 點點數，讓您的圖片煥然一新！\n\n請先上傳一張您想要編輯的圖片，然後我會請您描述想要的編輯效果 🖼️"
+                text=f"{user_name} 你好！✨\n🎨 圖片編輯功能\n\n💎 此功能會消耗 {self.required_points} 點點數，讓您的圖片煥然一新！\n\n請先上傳一張您想要編輯的圖片，然後我會請您描述想要的編輯效果 🖼️"
             ),
             user_id,
             event  # 傳遞 event 以支援群組聊天
@@ -127,7 +140,7 @@ class EditFeature(BaseFeature):
         try:
             # 獲取暫存的圖片數據
             user_state = self.get_user_state(user_id)
-            image_data = user_state.get("image_data")
+            image_data = user_state.get("data", {}).get("image_data") if user_state else None
             
             if not image_data:
                 self.clear_user_state(user_id)
@@ -139,9 +152,7 @@ class EditFeature(BaseFeature):
                 )
             
             # 設定狀態為正在處理，保留圖片數據和描述
-            self.state_manager.set_state(user_id, {
-                "feature": self.name,
-                "state": "processing",
+            self.set_user_state(user_id, "processing", {
                 "image_data": image_data,
                 "description": description
             })
@@ -171,8 +182,8 @@ class EditFeature(BaseFeature):
                         print(f"用戶 {user_id} 狀態已清除，停止處理")
                         return
                     
-                    image_data = current_state.get("image_data")
-                    description = current_state.get("description")
+                    image_data = current_state.get("data", {}).get("image_data")
+                    description = current_state.get("data", {}).get("description")
                     
                     if not image_data or not description:
                         error_result = self.publisher.process_push_message(
@@ -189,6 +200,16 @@ class EditFeature(BaseFeature):
                     
                     # 使用 Replicate API 處理圖片
                     output_url = self._edit_image(image_bytes, description)
+                    
+                    # 扣除點數（如果有 member_service）
+                    if self.member_service:
+                        success = self.member_service.deduct_points(
+                            user_id, 
+                            self.required_points, 
+                            f"圖片編輯：{description[:20]}"
+                        )
+                        if not success:
+                            print(f"⚠️ 扣點失敗，但圖片已處理完成: {user_id}")
                     
                     # 回傳編輯後的圖片（載入動畫會自動停止）
                     error_result = self.publisher.process_push_message(
