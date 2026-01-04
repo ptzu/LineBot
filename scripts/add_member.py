@@ -67,11 +67,11 @@ def add_member():
         
         if member:
             print(f"\n✅ 會員新增成功！")
-            print(f"   ID: {member.user_id}")
-            print(f"   姓名: {member.display_name}")
-            print(f"   點數: {member.points}")
-            print(f"   狀態: {member.status}")
-            print(f"   建立時間: {member.created_at}")
+            print(f"   ID: {member['user_id']}")
+            print(f"   姓名: {member['display_name']}")
+            print(f"   點數: {member['points']}")
+            print(f"   狀態: {member['status']}")
+            print(f"   建立時間: {member['created_at']}")
             
             # 詢問是否要增加點數
             add_points = input("\n是否要為此會員增加點數？(y/n): ").strip().lower()
@@ -153,3 +153,6 @@ if __name__ == "__main__":
         list_members()
     else:
         print("❌ 無效的選擇")
+
+
+

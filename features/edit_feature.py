@@ -79,9 +79,7 @@ class EditFeature(BaseFeature):
             image_bytes = b''.join(chunk for chunk in message_content.iter_content())
             
             # 2. 設定狀態為等待編輯描述，同時保存圖片數據
-            self.state_manager.set_state(user_id, {
-                "feature": self.name,
-                "state": "waiting_description",
+            self.set_user_state(user_id, "waiting_description", {
                 "image_data": base64.b64encode(image_bytes).decode('utf-8')
             })
             
@@ -113,11 +111,11 @@ class EditFeature(BaseFeature):
         # 檢查點數（如果有 member_service）
         if self.member_service:
             member = self.member_service.get_or_create_member(user_id, user_name)
-            if member.points < self.required_points:
+            if member['points'] < self.required_points:
                 result = self.publisher.process_reply_message(
                     reply_token,
                     TextSendMessage(
-                        text=f"❌ 點數不足！\n\n💎 目前點數：{member.points} 點\n💰 需要點數：{self.required_points} 點\n\n請輸入「點數」查看詳細資訊"
+                        text=f"❌ 點數不足！\n\n💎 目前點數：{member['points']} 點\n💰 需要點數：{self.required_points} 點\n\n請輸入「點數」查看詳細資訊"
                     ),
                     user_id,
                     event
@@ -142,7 +140,7 @@ class EditFeature(BaseFeature):
         try:
             # 獲取暫存的圖片數據
             user_state = self.get_user_state(user_id)
-            image_data = user_state.get("image_data")
+            image_data = user_state.get("data", {}).get("image_data") if user_state else None
             
             if not image_data:
                 self.clear_user_state(user_id)
@@ -154,9 +152,7 @@ class EditFeature(BaseFeature):
                 )
             
             # 設定狀態為正在處理，保留圖片數據和描述
-            self.state_manager.set_state(user_id, {
-                "feature": self.name,
-                "state": "processing",
+            self.set_user_state(user_id, "processing", {
                 "image_data": image_data,
                 "description": description
             })
@@ -186,8 +182,8 @@ class EditFeature(BaseFeature):
                         print(f"用戶 {user_id} 狀態已清除，停止處理")
                         return
                     
-                    image_data = current_state.get("image_data")
-                    description = current_state.get("description")
+                    image_data = current_state.get("data", {}).get("image_data")
+                    description = current_state.get("data", {}).get("description")
                     
                     if not image_data or not description:
                         error_result = self.publisher.process_push_message(

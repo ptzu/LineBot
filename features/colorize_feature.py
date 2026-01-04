@@ -157,11 +157,11 @@ class ColorizeFeature(BaseFeature):
         # 檢查點數（如果有 member_service）
         if self.member_service:
             member = self.member_service.get_or_create_member(user_id, user_name)
-            if member.points < self.required_points:
+            if member['points'] < self.required_points:
                 result = self.publisher.process_reply_message(
                     reply_token,
                     TextSendMessage(
-                        text=f"❌ 點數不足！\n\n💎 目前點數：{member.points} 點\n💰 需要點數：{self.required_points} 點\n\n請輸入「點數」查看詳細資訊"
+                        text=f"❌ 點數不足！\n\n💎 目前點數：{member['points']} 點\n💰 需要點數：{self.required_points} 點\n\n請輸入「點數」查看詳細資訊"
                     ),
                     user_id,
                     event

@@ -255,7 +255,7 @@ def handle_follow_event(event):
             print("❌ 建立會員失敗")
             return None
         
-        print(f"✅ 會員已建立: {member.display_name}")
+        print(f"✅ 會員已建立: {member['display_name']}")
         
         # 檢查是否需要贈送註冊獎勵點數
         welcome_points = int(os.getenv("WELCOME_POINTS", "0"))
@@ -275,8 +275,8 @@ def handle_follow_event(event):
         welcome_message = f"""🎉 歡迎加入！
 
 👤 會員註冊成功
-📝 姓名：{member.display_name}
-💎 點數：{member.points} 點"""
+📝 姓名：{member['display_name']}
+💎 點數：{member['points']} 點"""
 
         if welcome_points > 0:
             welcome_message += f"\n🎁 註冊獎勵：+{welcome_points} 點"

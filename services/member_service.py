@@ -18,7 +18,7 @@ class MemberService:
             email: 信箱
             
         Returns:
-            Member: 會員物件
+            dict: 會員資料字典
         """
         with get_session() as session:
             member = session.query(Member).filter_by(user_id=user_id).first()
@@ -40,9 +40,8 @@ class MemberService:
                     session.commit()
                     print(f"✅ 會員資訊已更新: {user_id}")
                 
-                # 重新查詢以取得最新資料
-                session.expire(member)
-                return session.query(Member).filter_by(user_id=user_id).first()
+                # 在 session 內轉換為字典
+                return member.to_dict()
             else:
                 # 建立新會員（初始點數 0）
                 new_member = Member(
@@ -57,8 +56,8 @@ class MemberService:
                 session.commit()
                 print(f"✅ 新會員已建立: {user_id} ({display_name})")
                 
-                # 重新查詢以取得完整資料
-                return session.query(Member).filter_by(user_id=user_id).first()
+                # 在 session 內轉換為字典
+                return new_member.to_dict()
     
     def get_member_info(self, user_id):
         """
@@ -68,10 +67,13 @@ class MemberService:
             user_id: LINE user ID
             
         Returns:
-            Member: 會員物件，不存在則返回 None
+            dict: 會員資料字典，不存在則返回 None
         """
         with get_session() as session:
-            return session.query(Member).filter_by(user_id=user_id).first()
+            member = session.query(Member).filter_by(user_id=user_id).first()
+            if member:
+                return member.to_dict()
+            return None
     
     def get_member_points(self, user_id):
         """

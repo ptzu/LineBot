@@ -8,13 +8,14 @@
 - **🤖 智能對話**: 支援文字對話和功能選單
 - **⚡ 即時處理**: 背景非同步處理，不阻塞用戶體驗
 - **🔧 模組化設計**: 易於擴展新功能
-- **👤 用戶狀態管理**: 支援多用戶同時使用
+- **👤 用戶狀態管理**: 支援多用戶同時使用，狀態持久化儲存
 
 ## 📋 系統需求
 
 - Python 3.7+
 - LINE Developers 帳號
 - Replicate API 帳號
+- PostgreSQL 資料庫 (Supabase 推薦)
 - ngrok (本地測試用)
 
 ## 🛠️ 安裝與設定
@@ -50,6 +51,9 @@ CHANNEL_SECRET=your_line_channel_secret_here
 # Replicate API 設定
 REPLICATE_API_TOKEN=your_replicate_api_token_here
 
+# 資料庫設定 (Supabase 推薦)
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-ID].supabase.co:5432/postgres
+
 # 應用程式設定
 PORT=5000
 ```
@@ -66,7 +70,28 @@ PORT=5000
 2. 註冊帳號並取得 API Token
 3. 確保帳號有足夠的點數進行圖片處理
 
+#### 資料庫設定 (Supabase 推薦)
+1. 前往 [Supabase](https://supabase.com/)
+2. 建立新專案
+3. 在專案設定中取得資料庫連線字串
+4. 複製連線字串到 `.env` 檔案的 `DATABASE_URL`
+
 ## 🚀 啟動服務
+
+### 資料庫初始化
+
+在首次啟動前，需要初始化資料庫：
+
+```bash
+# 建立資料庫表格
+python scripts/init_db.py
+
+# 測試資料庫連線和狀態管理
+python test/test_user_state_db.py
+
+# 遷移現有狀態（如果有）
+python scripts/migrate_user_states.py
+```
 
 ### 本地開發環境
 

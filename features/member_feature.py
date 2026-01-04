@@ -11,8 +11,22 @@ class MemberFeature(BaseFeature):
     
     def can_handle(self, message: str, user_id: str) -> bool:
         """判斷是否能處理此訊息"""
-        commands = ["點數", "歷史", "會員資訊", "會員"]
-        return message.strip() in commands
+        message = message.strip()
+        
+        # 完全匹配的指令
+        exact_commands = ["點數", "歷史", "會員資訊", "會員"]
+        if message in exact_commands:
+            return True
+        
+        # 包含關鍵字的指令（支援更靈活的輸入）
+        if "點數" in message and ("查詢" in message or "查看" in message or message == "點數"):
+            return True
+        if "歷史" in message or "交易記錄" in message or "記錄" in message:
+            return True
+        if "會員" in message:
+            return True
+        
+        return False
     
     def handle_text(self, event: dict) -> dict:
         """處理文字訊息"""
@@ -21,10 +35,13 @@ class MemberFeature(BaseFeature):
         message = self.get_message_text(event).strip()
         user_name = self.get_user_name(user_id)
         
-        if message == "點數":
+        # 點數相關查詢
+        if message == "點數" or ("點數" in message and ("查詢" in message or "查看" in message)):
             return self._handle_points_query(user_id, user_name, reply_token, event)
-        elif message == "歷史":
+        # 歷史/交易記錄查詢
+        elif message == "歷史" or "交易記錄" in message or (message == "記錄"):
             return self._handle_history_query(user_id, user_name, reply_token, event)
+        # 會員資訊查詢
         elif message in ["會員資訊", "會員"]:
             return self._handle_member_info(user_id, user_name, reply_token, event)
         

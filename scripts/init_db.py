@@ -67,6 +67,7 @@ def main():
         # 顯示建立的資料表
         from models.member import Member
         from models.point_transaction import PointTransaction
+        from models.user_state import UserState
         
         print("已建立以下資料表：")
         print("  1. members - 會員表")
@@ -86,6 +87,13 @@ def main():
         print("     - balance_after")
         print("     - description")
         print("     - created_at")
+        print()
+        print("  3. user_states - 用戶狀態表")
+        print("     - user_id (主鍵)")
+        print("     - feature (功能名稱)")
+        print("     - state (狀態名稱)")
+        print("     - data (額外數據，JSON格式)")
+        print("     - created_at, updated_at")
         print()
         
         print("=" * 50)

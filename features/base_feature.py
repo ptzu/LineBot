@@ -113,9 +113,13 @@ class BaseFeature(ABC):
         """從 event 中獲取訊息 ID"""
         return event.get('message', {}).get('id', '')
     
-    def set_user_state(self, user_id: str, state: str):
+    def set_user_state(self, user_id: str, state: str, data: dict = None):
         """設定用戶狀態"""
-        self.state_manager.set_state(user_id, {"feature": self.name, "state": state})
+        self.state_manager.set_state(user_id, {
+            "feature": self.name, 
+            "state": state,
+            "data": data
+        })
     
     def get_user_state(self, user_id: str) -> dict:
         """獲取用戶狀態"""
