@@ -21,6 +21,50 @@ def init_database():
     
     print(f"🗄️  連接資料庫...")
     
+    # 處理 IPv6 問題：強制使用 IPv4
+    # Supabase 支援 IPv4 和 IPv6，但某些環境（如 Railway）可能不支援 IPv6
+    import re
+    
+    # 檢查是否為 Supabase 連線且需要強制 IPv4
+    if "supabase.co" in database_url:
+        # 在 connect_args 中加入 hostaddr 來強制解析 IPv4
+        print("🔧 檢測到 Supabase，配置 IPv4 優先連線...")
+        
+        # 解析主機名稱
+        match = re.search(r'@([^:]+):', database_url)
+        if match:
+            hostname = match.group(1)
+            print(f"🌐 主機名稱: {hostname}")
+            
+            # 嘗試解析 IPv4 地址
+            try:
+                import socket
+                # 強制使用 IPv4
+                ipv4_addr = socket.getaddrinfo(hostname, None, socket.AF_INET)[0][4][0]
+                print(f"✅ 解析到 IPv4: {ipv4_addr}")
+                
+                connect_args = {
+                    "connect_timeout": 10,
+                    "application_name": "linebot_member_system",
+                    "hostaddr": ipv4_addr  # 強制使用 IPv4 地址
+                }
+            except Exception as e:
+                print(f"⚠️  IPv4 解析失敗: {e}，使用預設連線")
+                connect_args = {
+                    "connect_timeout": 10,
+                    "application_name": "linebot_member_system"
+                }
+        else:
+            connect_args = {
+                "connect_timeout": 10,
+                "application_name": "linebot_member_system"
+            }
+    else:
+        connect_args = {
+            "connect_timeout": 10,
+            "application_name": "linebot_member_system"
+        }
+    
     # 建立 engine，優化連線設定
     _engine = create_engine(
         database_url,
@@ -28,10 +72,7 @@ def init_database():
         max_overflow=5,  # 減少最大溢出連線
         pool_pre_ping=True,  # 確保連線有效
         pool_recycle=3600,  # 連線回收時間（1小時）
-        connect_args={
-            "connect_timeout": 10,  # 連線超時時間
-            "application_name": "linebot_member_system"  # 應用程式名稱
-        },
+        connect_args=connect_args,
         echo=False  # 設為 True 可以看到 SQL 語句（開發用）
     )
     
