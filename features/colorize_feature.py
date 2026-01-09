@@ -29,11 +29,30 @@ class ColorizeFeature(BaseFeature):
         if message == "圖片彩色化":
             return True
         
+        # 檢查是否為全局命令（這些命令不應該被 colorize 攔截）
+        if self._is_global_command(message):
+            return False
+        
         # 檢查用戶是否在彩色化狀態中
         user_state = self.get_user_state(user_id)
         if user_state and user_state.get("feature") == self.name:
             return True
         
+        return False
+    
+    def _is_global_command(self, message: str) -> bool:
+        """檢查是否為全局命令"""
+        message = message.strip()
+        global_commands = [
+            "點數", "點數查詢", "查看點數", "查詢點數",
+            "歷史", "交易記錄", "記錄",
+            "會員", "會員資訊",
+            "!功能", "功能", "！功能", "使用說明", "其他功能"
+        ]
+        if message in global_commands:
+            return True
+        if "點數" in message and ("查詢" in message or "查看" in message):
+            return True
         return False
     
     def handle_text(self, event: dict) -> dict:
