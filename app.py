@@ -233,6 +233,15 @@ def handle_follow_event(event):
             print("⚠️  會員服務未啟用，跳過自動註冊")
             return None
         
+        # 檢查會員是否已存在（防止重複加好友刷點數）
+        existing_member = member_service.get_member_info(user_id)
+        is_new_member = existing_member is None
+        
+        if is_new_member:
+            print(f"✨ 檢測到新會員: {user_id}")
+        else:
+            print(f"👋 歡迎回來！會員已存在: {user_id}")
+        
         # 透過 LINE API 取得用戶資料
         try:
             profile = line_bot_api.get_profile(user_id)
@@ -244,7 +253,7 @@ def handle_follow_event(event):
             display_name = "使用者"
             picture_url = None
         
-        # 建立會員
+        # 建立或更新會員
         member = member_service.get_or_create_member(
             user_id=user_id,
             display_name=display_name,
@@ -255,11 +264,14 @@ def handle_follow_event(event):
             print("❌ 建立會員失敗")
             return None
         
-        print(f"✅ 會員已建立: {member['display_name']}")
+        if is_new_member:
+            print(f"✅ 新會員已建立: {member['display_name']}")
+        else:
+            print(f"✅ 會員資料已更新: {member['display_name']}")
         
-        # 檢查是否需要贈送註冊獎勵點數
+        # 只對新會員贈送註冊獎勵點數
         welcome_points = int(os.getenv("WELCOME_POINTS", "0"))
-        if welcome_points > 0:
+        if is_new_member and welcome_points > 0:
             success = member_service.add_points(
                 user_id=user_id,
                 points=welcome_points,
@@ -271,17 +283,18 @@ def handle_follow_event(event):
             else:
                 print("❌ 贈送註冊獎勵失敗")
         
-        # 發送歡迎訊息
-        welcome_message = f"""🎉 歡迎加入！
+        # 發送歡迎訊息（新舊會員不同內容）
+        if is_new_member:
+            welcome_message = f"""🎉 歡迎加入！
 
 👤 會員註冊成功
 📝 姓名：{member['display_name']}
 💎 點數：{member['points']} 點"""
 
-        if welcome_points > 0:
-            welcome_message += f"\n🎁 註冊獎勵：+{welcome_points} 點"
+            if welcome_points > 0:
+                welcome_message += f"\n🎁 註冊獎勵：+{welcome_points} 點"
 
-        welcome_message += """
+            welcome_message += """
 
 📋 使用說明：
 • 輸入「!功能」查看功能表
@@ -290,6 +303,20 @@ def handle_follow_event(event):
 • 輸入「圖片編輯」編輯照片
 
 💡 開始使用吧！"""
+        else:
+            # 舊會員重新加入
+            welcome_message = f"""👋 歡迎回來！
+
+📝 姓名：{member['display_name']}
+💎 剩餘點數：{member['points']} 點
+
+📋 使用說明：
+• 輸入「!功能」查看功能表
+• 輸入「點數」查看剩餘點數
+• 輸入「圖片彩色化」處理黑白照片
+• 輸入「圖片編輯」編輯照片
+
+💡 繼續使用吧！"""
 
         # 發送歡迎訊息
         try:
