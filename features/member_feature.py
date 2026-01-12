@@ -50,35 +50,17 @@ class MemberFeature(BaseFeature):
     def _handle_points_query(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理點數查詢"""
         try:
-            from models.database import get_session
-            from models.member import Member
+            # 使用統一的會員服務獲取或建立會員
+            member = self.member_service.get_or_create_member(user_id, user_name)
             
-            with get_session() as session:
-                # 直接在當前 session 中查詢或創建會員
-                member = session.query(Member).filter_by(user_id=user_id).first()
-                
-                if not member:
-                    # 建立新會員（初始點數 0）
-                    member = Member(
-                        user_id=user_id,
-                        display_name=user_name or "使用者",
-                        points=0,
-                        status='normal'
-                    )
-                    session.add(member)
-                    session.commit()
-                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
-                else:
-                    # 會員已存在，更新顯示名稱（如果有提供）
-                    if user_name and member.display_name != user_name:
-                        member.display_name = user_name
-                        session.commit()
-                        print(f"✅ 會員資訊已更新: {user_id}")
-                
-                # 在 session 內提取所需的屬性值
-                display_name = member.display_name
-                points = member.points
-                status = member.status
+            if not member:
+                self.publisher.reply_text(reply_token, "❌ 無法取得會員資料，請稍後再試", user_id, event)
+                return "OK"
+            
+            # 從字典中提取所需的屬性值
+            display_name = member['display_name']
+            points = member['points']
+            status = member['status']
             
             # 狀態顯示
             status_map = {
@@ -120,33 +102,15 @@ class MemberFeature(BaseFeature):
     def _handle_history_query(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理交易記錄查詢"""
         try:
-            from models.database import get_session
-            from models.member import Member
+            # 使用統一的會員服務獲取或建立會員
+            member = self.member_service.get_or_create_member(user_id, user_name)
             
-            with get_session() as session:
-                # 直接在當前 session 中查詢或創建會員
-                member = session.query(Member).filter_by(user_id=user_id).first()
-                
-                if not member:
-                    # 建立新會員（初始點數 0）
-                    member = Member(
-                        user_id=user_id,
-                        display_name=user_name or "使用者",
-                        points=0,
-                        status='normal'
-                    )
-                    session.add(member)
-                    session.commit()
-                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
-                else:
-                    # 會員已存在，更新顯示名稱（如果有提供）
-                    if user_name and member.display_name != user_name:
-                        member.display_name = user_name
-                        session.commit()
-                        print(f"✅ 會員資訊已更新: {user_id}")
-                
-                # 在 session 內提取點數
-                current_points = member.points
+            if not member:
+                self.publisher.reply_text(reply_token, "❌ 無法取得會員資料，請稍後再試", user_id, event)
+                return "OK"
+            
+            # 從字典中提取點數
+            current_points = member['points']
             
             # 查詢交易記錄
             transactions = self.member_service.get_point_history(user_id, limit=10)
@@ -204,36 +168,18 @@ class MemberFeature(BaseFeature):
     def _handle_member_info(self, user_id: str, user_name: str, reply_token: str, event: dict):
         """處理會員資訊查詢"""
         try:
-            from models.database import get_session
-            from models.member import Member
+            # 使用統一的會員服務獲取或建立會員
+            member = self.member_service.get_or_create_member(user_id, user_name)
             
-            with get_session() as session:
-                # 直接在當前 session 中查詢或創建會員
-                member = session.query(Member).filter_by(user_id=user_id).first()
-                
-                if not member:
-                    # 建立新會員（初始點數 0）
-                    member = Member(
-                        user_id=user_id,
-                        display_name=user_name or "使用者",
-                        points=0,
-                        status='normal'
-                    )
-                    session.add(member)
-                    session.commit()
-                    print(f"✅ 新會員已建立: {user_id} ({user_name})")
-                else:
-                    # 會員已存在，更新顯示名稱（如果有提供）
-                    if user_name and member.display_name != user_name:
-                        member.display_name = user_name
-                        session.commit()
-                        print(f"✅ 會員資訊已更新: {user_id}")
-                
-                # 在 session 內提取所需的屬性值
-                display_name = member.display_name
-                points = member.points
-                status = member.status
-                created_at = member.created_at
+            if not member:
+                self.publisher.reply_text(reply_token, "❌ 無法取得會員資料，請稍後再試", user_id, event)
+                return "OK"
+            
+            # 從字典中提取所需的屬性值
+            display_name = member['display_name']
+            points = member['points']
+            status = member['status']
+            created_at_str = member['created_at']
             
             # 狀態顯示
             status_map = {
@@ -244,8 +190,17 @@ class MemberFeature(BaseFeature):
             }
             status_text = status_map.get(status, status)
             
-            # 格式化日期
-            created_at_str = created_at.strftime("%Y/%m/%d %H:%M") if created_at else "未知"
+            # 格式化日期（從 ISO 字符串轉換）
+            if created_at_str:
+                try:
+                    from datetime import datetime
+                    created_at = datetime.fromisoformat(created_at_str)
+                    created_at_str = created_at.strftime("%Y/%m/%d %H:%M")
+                except Exception as e:
+                    print(f"⚠️ 日期格式化失敗: {str(e)}")
+                    created_at_str = "未知"
+            else:
+                created_at_str = "未知"
             
             response = f"""👤 會員資訊
 
